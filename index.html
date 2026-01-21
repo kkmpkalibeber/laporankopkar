@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan Tutup Buku - KOPKAR ATTA'AWUN</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet">
+  <style>
+    /* ... (CSS styles tetap sama seperti sebelumnya) ... */
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+</head>
+<body class="h-full">
+  <div id="app" class="h-full overflow-auto">
+    <!-- ... (HTML structure tetap sama) ... -->
+  </div>
+  
+  <script>
+    // State
+    let allMembers = [];
+    let currentUser = null;
+    let config = {};
+
+    const defaultConfig = {
+      report_title: 'Laporan Tutup Buku Th. 2025',
+      organization_name: 'KOPKAR ATTA\'AWUN',
+      year_period: '2025',
+      total_asset: 'Rp. 1.207.995.657',
+      total_income: 'Rp. 171.080.552',
+      total_expense: 'Rp. 59.470.945',
+      shu_2025: 'Rp. 111.609.607',
+      primary_color: '#0f172a',
+      secondary_color: '#059669',
+      accent_color: '#2563eb',
+      text_color: '#1f2937',
+      background_color: '#f8fafc',
+      font_family: 'Inter'
+    };
+
+    // Google Sheets URL
+    const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTgF6TOXUEU5lkes0myZTiEnI1LhmWx_kD73RordpVoviaHsO_ih58oPJz6IJnFxdOoMgaE0ncoch_-/pub?gid=0&single=true&output=csv';
+
+    // Function to fetch data from Google Sheets
+    async function fetchDataFromGoogleSheets() {
+      showLoading('Mengambil data dari Google Sheets...');
+      
+      try {
+        const response = await fetch(GOOGLE_SHEETS_URL);
+        const csvText = await response.text();
+        
+        // Parse CSV
+        const rows = csvText.split('\n');
+        const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+        
+        // Map headers to match your field names
+        const headerMap = {
+          'id ang': 'id_anggota',
+          'nama': 'nama',
+          'simpanan': 'simpanan',
+          'piutang': 'piutang',
+          'ss': 'ss',
+          'tab harian': 'tab_harian',
+          'shr': 'shr',
+          'shu diterima': 'shu_diterima'
+        };
+        
+        const members = [];
+        
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row.trim()) continue;
+          
+          const values = row.split(',').map(v => v.trim());
+          const member = {
+            record_type: 'member',
+            __backendId: `member_${i}` // Generate unique ID
+          };
+          
+          // Map values to fields
+          headers.forEach((header, index) => {
+            const mappedField = headerMap[header];
+            if (mappedField && values[index]) {
+              member[mappedField] = values[index];
+            }
+          });
+          
+          // Skip if missing essential fields
+          if (member.id_anggota && member.nama) {
+            members.push(member);
+          }
+        }
+        
+        allMembers = members;
+        updateUI();
+        hideLoading();
+        
+        if (members.length > 0) {
+          showToast(`Berhasil mengambil ${members.length} data dari Google Sheets`, 'success');
+        } else {
+          showToast('Tidak ada data ditemukan di Google Sheets', 'warning');
+        }
+        
+      } catch (error) {
+        hideLoading();
+        console.error('Error fetching data:', error);
+        showToast('Gagal mengambil data dari Google Sheets. Periksa koneksi internet.', 'error');
+        
+        // Fallback: try to use data SDK if available
+        if (window.dataSdk) {
+          try {
+            const result = await window.dataSdk.getAll();
+            if (result.isOk) {
+              allMembers = result.data.filter(d => d.record_type === 'member');
+              updateUI();
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+      }
+    }
+
+    // Initialize
+    async function init() {
+      config = { ...defaultConfig };
+
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange: async (newConfig) => {
+            config = { ...defaultConfig, ...newConfig };
+            applyConfig();
+          },
+          mapToCapabilities: (cfg) => ({
+            recolorables: [
+              { get: () => cfg.primary_color || defaultConfig.primary_color, set: (v) => { cfg.primary_color = v; window.elementSdk.setConfig({ primary_color: v }); }},
+              { get: () => cfg.secondary_color || defaultConfig.secondary_color, set: (v) => { cfg.secondary_color = v; window.elementSdk.setConfig({ secondary_color: v }); }},
+              { get: () => cfg.accent_color || defaultConfig.accent_color, set: (v) => { cfg.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); }},
+              { get: () => cfg.text_color || defaultConfig.text_color, set: (v) => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); }},
+              { get: () => cfg.background_color || defaultConfig.background_color, set: (v) => { cfg.background_color = v; window.elementSdk.setConfig({ background_color: v }); }}
+            ],
+            borderables: [],
+            fontEditable: {
+              get: () => cfg.font_family || defaultConfig.font_family,
+              set: (v) => { cfg.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
+            },
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (cfg) => new Map([
+            ['report_title', cfg.report_title || defaultConfig.report_title],
+            ['organization_name', cfg.organization_name || defaultConfig.organization_name],
+            ['year_period', cfg.year_period || defaultConfig.year_period],
+            ['total_asset', cfg.total_asset || defaultConfig.total_asset],
+            ['total_income', cfg.total_income || defaultConfig.total_income],
+            ['total_expense', cfg.total_expense || defaultConfig.total_expense],
+            ['shu_2025', cfg.shu_2025 || defaultConfig.shu_2025]
+          ])
+        });
+        config = { ...defaultConfig, ...window.elementSdk.config };
+      }
+
+      applyConfig();
+      
+      // Fetch data from Google Sheets
+      await fetchDataFromGoogleSheets();
+      
+      // Set up auto-refresh every 5 minutes
+      setInterval(fetchDataFromGoogleSheets, 5 * 60 * 1000);
+    }
+
+    function applyConfig() {
+      const title = config.report_title || defaultConfig.report_title;
+      const org = config.organization_name || defaultConfig.organization_name;
+      const font = config.font_family || defaultConfig.font_family;
+
+      const titleElements = document.querySelectorAll('#header-title, #login-report-title');
+      titleElements.forEach(el => el.textContent = title);
+
+      const orgElements = document.querySelectorAll('#header-org, #login-org-name');
+      orgElements.forEach(el => el.textContent = org);
+
+      document.body.style.fontFamily = `${font}, 'Inter', sans-serif`;
+    }
+
+    function handleLogin(event) {
+      event.preventDefault();
+      
+      const userType = document.getElementById('user-type').value;
+      const password = document.getElementById('password').value;
+
+      const credentials = {
+        'admin': 'f4150l',
+        'member': 'kopkarjaya'
+      };
+
+      if (password.toLowerCase() !== credentials[userType].toLowerCase()) {
+        showToast('Password salah! Silakan coba lagi.', 'error');
+        return;
+      }
+
+      currentUser = userType;
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('main-app').classList.remove('hidden');
+
+      if (userType === 'admin') {
+        document.getElementById('admin-panel').classList.remove('hidden');
+        document.getElementById('member-panel').classList.add('hidden');
+        document.getElementById('user-badge').textContent = 'Administrator';
+      } else {
+        document.getElementById('admin-panel').classList.add('hidden');
+        document.getElementById('member-panel').classList.remove('hidden');
+        document.getElementById('user-badge').textContent = 'Anggota Koperasi';
+      }
+
+      showToast(`Selamat datang, ${userType === 'admin' ? 'Administrator' : 'Anggota'}!`, 'success');
+      updateUI();
+    }
+
+    // Remove old importData function and replace with refresh function
+    async function refreshData() {
+      await fetchDataFromGoogleSheets();
+    }
+
+    // Update the admin panel to remove import section and add refresh button
+    // In the HTML, replace the admin panel import section with:
+    /* 
+    <div class="glass-card rounded-3xl shadow-2xl p-8 mb-8">
+      <div class="flex items-center gap-4 mb-8">
+        <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
+          <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">Sumber Data</h2>
+          <p class="text-gray-500 font-medium">Data diambil langsung dari Google Sheets</p>
+        </div>
+      </div>
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl p-5 mb-6">
+        <p class="text-blue-900 font-semibold mb-2">📊 Google Sheets URL:</p>
+        <code class="text-xs text-blue-800 bg-white/70 px-3 py-2 rounded-lg block font-mono break-all">https://docs.google.com/spreadsheets/d/e/2PACX-1vTgF6TOXUEU5lkes0myZTiEnI1LhmWx_kD73RordpVoviaHsO_ih58oPJz6IJnFxdOoMgaE0ncoch_-/pub?gid=0&single=true&output=csv</code>
+        <p class="text-blue-700 text-xs mt-3">✅ Data akan diperbarui otomatis setiap 5 menit</p>
+        <p class="text-blue-800 text-xs mt-2 font-semibold">🔄 Klik tombol Refresh untuk memperbarui data sekarang</p>
+      </div>
+      <div class="flex gap-4">
+        <button onclick="refreshData()" class="btn-primary px-8 py-4 text-white rounded-xl font-bold shadow-lg flex items-center gap-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Data
+        </button>
+        <button onclick="clearAllData()" class="px-8 py-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold transition-all flex items-center gap-3 border-2 border-red-200">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Hapus Semua (Local)
+        </button>
+      </div>
+    </div>
+    */
+
+    // Remove functions that are no longer needed:
+    // - importData()
+    // - showFailedImports()
+    // - retryFailedImport()
+    // - And remove the failed import section from HTML
+
+    // Keep other functions (searchMember, showMemberDetail, printPreview, etc.) as they are
+
+    // ... (keep the rest of your JavaScript functions like searchMember, showMemberDetail, etc.) ...
+
+    // Update updateAdminTable to not rely on dataSdk
+    function updateAdminTable() {
+      const tbody = document.getElementById('admin-table-body');
+      const count = document.getElementById('admin-count');
+
+      count.textContent = `${allMembers.length} data terdaftar`;
+
+      if (allMembers.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="px-5 py-16 text-center text-gray-400">
+              <div class="flex flex-col items-center gap-3">
+                <svg class="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span class="font-medium">Tidak ada data. Klik Refresh untuk mengambil data.</span>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = allMembers.map(m => `
+        <tr class="border-b border-gray-100">
+          <td class="px-5 py-4 text-gray-700 font-medium">${m.id_anggota}</td>
+          <td class="px-5 py-4 text-gray-800 font-semibold">${m.nama}</td>
+          <td class="px-5 py-4 text-right text-gray-700">${m.simpanan || '0'}</td>
+          <td class="px-5 py-4 text-right text-gray-700">${m.piutang || '0'}</td>
+          <td class="px-5 py-4 text-right text-gray-700">${m.ss || '0'}</td>
+          <td class="px-5 py-4 text-right text-gray-700">${m.tab_harian || '0'}</td>
+          <td class="px-5 py-4 text-right text-gray-700">${m.shr || '0'}</td>
+          <td class="px-5 py-4 text-right font-semibold text-emerald-600">${m.shu_diterima || '0'}</td>
+          <td class="px-5 py-4 text-center">
+            <button onclick="showToast('Data hanya dapat diubah melalui Google Sheets', 'info')" class="p-2.5 text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="Edit di Google Sheets">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Remove the old clearAllData function since we're not using local storage
+    function clearAllData() {
+      if (!window.dataSdk) {
+        showToast('Fitur ini hanya tersedia dengan Canva Data SDK', 'info');
+        return;
+      }
+      
+      if (allMembers.length === 0) {
+        showToast('Tidak ada data untuk dihapus', 'warning');
+        return;
+      }
+
+      document.getElementById('confirm-message').textContent = `Apakah Anda yakin ingin menghapus SEMUA ${allMembers.length} data anggota dari database lokal?`;
+      document.getElementById('confirm-btn').onclick = async () => {
+        closeModal();
+        showLoading('Menghapus semua data...');
+
+        let deleted = 0;
+        for (const member of [...allMembers]) {
+          const result = await window.dataSdk.delete(member);
+          if (result.isOk) deleted++;
+        }
+
+        hideLoading();
+        showToast(`${deleted} data berhasil dihapus dari database lokal`, 'success');
+        await fetchDataFromGoogleSheets();
+      };
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    // ... (keep the rest of your utility functions) ...
+
+    // Start
+    init();
+  </script>
+</body>
+</html>
